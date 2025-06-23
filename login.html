@@ -1,25 +1,154 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 	<head>
 		<meta http-equiv="content-type" content="text/html; charset=UTF-8">
-		<title>Login Window</title>
-                <script type="text/javascript" src="config.json"></script>
-		<script type='text/javascript'>//<![CDATA[ 
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>TomOi.vn - Đăng nhập Spotify</title>
+		<meta name="description" content="Trang xác thực đăng nhập Spotify cho công cụ backup và chuyển playlist giữa các tài khoản." />
+		<meta name="keywords" content="spotify, login, đăng nhập spotify, backup spotify, tomoi" />
+		<meta name="author" content="TomOi.vn" />
+		
+		<!-- Open Graph / Facebook -->
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://tools.tomoi.vn/backup-spotify/login.html" />
+		<meta property="og:title" content="Đăng nhập Spotify - TomOi.vn" />
+		<meta property="og:description" content="Đăng nhập vào Spotify để bắt đầu sử dụng công cụ backup và chuyển playlist." />
+		<meta property="og:image" content="https://tools.tomoi.vn/backup-spotify/og-image.jpg" />
 
+		<!-- Twitter -->
+		<meta property="twitter:card" content="summary_large_image" />
+		<meta property="twitter:url" content="https://tools.tomoi.vn/backup-spotify/login.html" />
+		<meta property="twitter:title" content="Đăng nhập Spotify - TomOi.vn" />
+		<meta property="twitter:description" content="Đăng nhập vào Spotify để bắt đầu sử dụng công cụ backup và chuyển playlist." />
+		<meta property="twitter:image" content="https://tools.tomoi.vn/backup-spotify/og-image.jpg" />
+		
+		<!-- Favicon -->
+		<link rel="icon" href="favicon.ico" type="image/x-icon">
+		<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+		
+		<!-- Canonical URL -->
+		<link rel="canonical" href="https://tools.tomoi.vn/backup-spotify/login.html" />
+
+		<script type="text/javascript" src="config.js"></script>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+		<style>
+			:root {
+				--spotify-green: #1DB954;
+				--dark-bg: #121212;
+				--light-bg: #ffffff;
+				--error-color: #e74c3c;
+			}
+			
+			body {
+				font-family: 'Inter', sans-serif;
+				background-color: #f5f5f7;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				height: 100vh;
+				margin: 0;
+				padding: 20px;
+			}
+			
+			.loader-container {
+				text-align: center;
+				padding: 24px;
+				background-color: white;
+				border-radius: 12px;
+				box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+				max-width: 400px;
+				width: 100%;
+			}
+			
+			.loader {
+				border: 4px solid #f3f3f3;
+				border-radius: 50%;
+				border-top: 4px solid var(--spotify-green);
+				width: 40px;
+				height: 40px;
+				margin: 20px auto;
+				-webkit-animation: spin 1s linear infinite;
+				animation: spin 1s linear infinite;
+			}
+			
+			@-webkit-keyframes spin {
+				0% { -webkit-transform: rotate(0deg); }
+				100% { -webkit-transform: rotate(360deg); }
+			}
+			
+			@keyframes spin {
+				0% { transform: rotate(0deg); }
+				100% { transform: rotate(360deg); }
+			}
+			
+			h3 {
+				margin-top: 0;
+				color: #333;
+			}
+
+			.error-message {
+				color: var(--error-color);
+				padding: 10px;
+				margin-top: 20px;
+				border: 1px solid var(--error-color);
+				border-radius: 8px;
+				display: none;
+			}
+		</style>
+		<script type='text/javascript'>
 			var conf = config;
 
 			window.onload = function() {
 				var target = window.self === window.top ? window.opener : window.parent;
 				var hash = window.location.hash;
-				if (hash) {
-				    var token = window.location.hash.split('&')[0].split('=')[1];
-				    target.postMessage(token, conf.uri); //embedded
+				
+				// Hiển thị lỗi nếu không có hash (access token)
+				if (!hash || hash.length < 2) {
+					document.getElementById('error-message').style.display = 'block';
+					document.getElementById('error-message').innerText = 'Không thể lấy token xác thực từ Spotify. Vui lòng thử lại.';
+					document.getElementById('loading-message').style.display = 'none';
+					document.getElementById('loading-spinner').style.display = 'none';
+					return;
+				}
+				
+				try {
+					var token = window.location.hash.split('&')[0].split('=')[1];
+					
+					if (!token) {
+						throw new Error('Token không hợp lệ');
+					}
+					
+					// Gửi token đến cửa sổ chính
+					target.postMessage(token, conf.uri);
+					
+					// Hiển thị thông báo thành công
+					document.getElementById('status-message').innerText = 'Xác thực thành công! Đang chuyển hướng...';
+				} catch (e) {
+					console.error('Lỗi xử lý token:', e);
+					document.getElementById('error-message').style.display = 'block';
+					document.getElementById('error-message').innerText = 'Lỗi xử lý token: ' + e.message;
+					document.getElementById('loading-message').style.display = 'none';
+					document.getElementById('loading-spinner').style.display = 'none';
 				}
 			}
 		</script>
 	</head>
 	<body>
-	  
+		<div class="loader-container">
+			<h3>Đang xác thực...</h3>
+			<div class="loader" id="loading-spinner"></div>
+			<p id="loading-message">Vui lòng đợi trong khi chúng tôi kết nối với Spotify</p>
+			<p id="status-message"></p>
+			<div id="error-message" class="error-message"></div>
+
+			<div style="margin-top: 20px; font-size: 12px; color: #888;">
+				Nếu gặp lỗi, hãy kiểm tra:
+				<ul style="text-align: left;">
+					<li>URL chuyển hướng đã được đăng ký trong Spotify Developer Dashboard</li>
+					<li>Client ID và URI cấu hình đã chính xác</li>
+				</ul>
+			</div>
+		</div>
 	</body>
 </html>
 

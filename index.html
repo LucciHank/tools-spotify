@@ -868,25 +868,87 @@ function bindControls() {
 
 function handleAuth(accessToken) {
     token = accessToken;
-    // fetch my public playlists
+    // Fetch user profile information
     $.ajax({
         url: 'https://api.spotify.com/v1/me',
         headers: {
-        'Authorization': 'Bearer ' + accessToken
+            'Authorization': 'Bearer ' + accessToken,
+            'Content-Type': 'application/json'
         },
-        success: function(response) {         
-            var user_id = response.id.toLowerCase();
-            userId = user_id;
-            name = user_id;
-
+        success: function(response) {
+            // Lưu thông tin người dùng
+            userId = response.id;
+            name = response.display_name || response.id;
+            
+            // Hiển thị thông tin người dùng
             $('#userName').html(name);
+            
+            // Hiển thị ảnh đại diện nếu có
+            displayUserProfile(response);
+            
+            // Ẩn màn hình đăng nhập, hiển thị thông tin
             $('#pnlLoggedOut').hide();
+            $('#pnlLoadingAccount').show();
 
+            // Tải dữ liệu playlist và tracks
+            $('#loadingTitle').html('Vui lòng đợi. Đang tải playlist và bài hát của bạn...');
             refreshTrackData(function () {                   
                 $('#pnlAction').show();
             });
+        },
+        error: function(xhr, status, error) {
+            console.error("Lỗi API /me:", error);
+            if (xhr.status === 401) {
+                alert("Token không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.");
+                window.localStorage.removeItem('spotify_token');
+                location.reload();
+            } else {
+                alert("Không thể lấy thông tin tài khoản: " + error);
+            }
         }
     });
+}
+
+// Hàm hiển thị thông tin hồ sơ từ API /me
+function displayUserProfile(profile) {
+    // Thêm phần HTML chứa thông tin người dùng nếu chưa có
+    if ($('#userProfileInfo').length === 0) {
+        $('#pnlLoadingAccount .title-medium').after('<div id="userProfileInfo" style="display: flex; align-items: center; margin: 10px 0 20px 0;"></div>');
+    }
+    
+    let profileHtml = '';
+    
+    // Hiển thị avatar nếu có
+    if (profile.images && profile.images.length > 0) {
+        let imageUrl = profile.images[0].url;
+        profileHtml += `<div class="user-avatar" style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; margin-right: 15px;">
+            <img src="${imageUrl}" alt="${profile.display_name}" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>`;
+    } else {
+        // Avatar mặc định nếu không có ảnh
+        profileHtml += `<div class="user-avatar" style="width: 50px; height: 50px; border-radius: 50%; background-color: #ddd; display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+            <i class="fas fa-user" style="color: #888; font-size: 20px;"></i>
+        </div>`;
+    }
+    
+    // Thông tin người dùng
+    profileHtml += `<div class="user-info">
+        <div style="font-weight: 600; font-size: 18px;">${profile.display_name || profile.id}</div>
+        <div style="font-size: 14px; color: #666;">
+            <span>${profile.email || ''}</span>
+            ${profile.country ? `<span> · ${profile.country}</span>` : ''}
+            <span> · ${profile.product === 'premium' ? 'Premium' : 'Free'}</span>
+        </div>
+    </div>`;
+    
+    // Thêm nút mở profile trên Spotify
+    if (profile.external_urls && profile.external_urls.spotify) {
+        profileHtml += `<a href="${profile.external_urls.spotify}" target="_blank" style="margin-left: auto; color: var(--spotify-green); font-size: 14px; text-decoration: none;">
+            <i class="fas fa-external-link-alt" style="margin-right: 5px;"></i>Xem trên Spotify
+        </a>`;
+    }
+    
+    $('#userProfileInfo').html(profileHtml);
 }
 
 function refreshMyMusicTracks(callback) {
@@ -924,14 +986,18 @@ function loadTrackChunksWithTimeout(url, arr, callback, timeout) {
         setTimeout(function() { console.log("Taking breath, not to fast my cheetah"); loadTrackChunks(url, arr, callback) }, conf.slowdown_export);
 }
 
-function loadTrackChunks(url, arr, callback) {
+function loadTrackChunks(url, arr, callback, retryCount = 0) {
+    const MAX_RETRIES = 3;
+    
     $.ajax({
         url: url,
         headers: {
-            'Authorization': 'Bearer ' + token
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
         },
         success: function (data) {
             if (!data) return;
+            
             if ('items' in data) {
                 $.each(data.items, function (index, value) {
                     if(value.track !== null){
@@ -943,10 +1009,28 @@ function loadTrackChunks(url, arr, callback) {
             } else {
                 arr.push({ id: data.track.id, uri: data.track.uri });
             }
+            
             if (data.next) {
                 loadTrackChunksWithTimeout(data.next, arr, callback);
             } else {
                 callback();
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("Lỗi khi tải tracks:", error, "URL:", url);
+            
+            // Thử lại nếu bị lỗi và chưa vượt quá số lần thử lại tối đa
+            if (retryCount < MAX_RETRIES) {
+                console.log(`Thử lại lần ${retryCount + 1} sau ${500 * Math.pow(2, retryCount)}ms`);
+                
+                // Exponential backoff
+                setTimeout(function() {
+                    loadTrackChunks(url, arr, callback, retryCount + 1);
+                }, 500 * Math.pow(2, retryCount));
+            } else {
+                // Đã thử lại quá số lần tối đa, hiển thị lỗi và tiếp tục
+                console.error(`Không thể tải dữ liệu sau ${MAX_RETRIES} lần thử lại`);
+                callback(); // Gọi callback để tiếp tục quy trình
             }
         }
     });

@@ -490,6 +490,7 @@ function login() {
     var left = (screen.width / 2) - (width / 2);
     var top = (screen.height / 2) - (height / 2);
 
+    // Sử dụng Implicit Grant Flow (response_type=token) - cách đơn giản nhất
     var set = {
       client_id: conf.client_id,
       redirect_uri: conf.redirect_uri,
@@ -497,6 +498,19 @@ function login() {
       response_type: 'token',
       show_dialog: 'true'
     };
+    
+    // Bạn có thể thử dùng Authorization Code Flow nếu Implicit Flow không được hỗ trợ
+    // (nhưng sẽ cần backend để trao đổi code lấy token)
+    /*
+    var set = {
+      client_id: conf.client_id,
+      redirect_uri: conf.redirect_uri,
+      scope: 'user-read-private user-read-email playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-read user-library-modify',
+      response_type: 'code',
+      show_dialog: 'true'
+    };
+    */
+    
     authWindow = window.open(
         "https://accounts.spotify.com/authorize?" + urlEncodeSet(set),
         "Spotify",
